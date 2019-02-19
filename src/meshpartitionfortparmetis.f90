@@ -7,7 +7,7 @@
 ! same type of elements.
 !
 ! Author: Dr. Chennakesava Kadapa
-! Date  : 01-Nov-2017
+! Date  : 02-Aug-2018
 ! Place : Swansea, UK
 !
 !
@@ -24,7 +24,7 @@
 ! infileElems  --- element <-> node connectivity file
 !
 ! Outpus:
-! partition-mesh.vtk file which can be viewed using Paraview or Mayavi
+! partition-mesh-parmetis.vtk file which can be viewed using Paraview or Mayavi
 !
 ! Note:
 ! Check the element<->node connectivity 
@@ -36,6 +36,7 @@
 
       IMPLICIT NONE
 
+include "mpif.h"
 
       ! declare variables
 
@@ -44,10 +45,6 @@
       INTEGER :: ndim          ! number of dimensions
       INTEGER :: eType         ! element type
       INTEGER :: metisType     ! metis algorithm type - nodal/dual
-      INTEGER :: nParts        ! number of partitions 
-      INTEGER :: nNode_global  ! number of nodes in the whole mesh
-      INTEGER :: nElem_global  ! number of global elements (in the whole model)
-      INTEGER :: npElem        ! number of nodes per element
       INTEGER :: io            ! for checking input/output (from files)
 
       CHARACTER(len=32) :: arg
@@ -55,6 +52,7 @@
       CHARACTER (LEN=100) :: infileNodes
       CHARACTER (LEN=100) :: infileElems
       CHARACTER (LEN=100) :: outfileName
+      CHARACTER (LEN=100) :: charTemp
       LOGICAL :: FILEEXISTS, ISOPEN
 
       DOUBLE PRECISION, DIMENSION(:,:), ALLOCATABLE :: coords
@@ -62,21 +60,49 @@
 
       INTEGER, DIMENSION(:), ALLOCATABLE :: elem_proc_id
       INTEGER, DIMENSION(:), ALLOCATABLE :: node_proc_id
+      INTEGER, DIMENSION(:), ALLOCATABLE :: elemdist
       INTEGER, DIMENSION(:), ALLOCATABLE :: eptr
       INTEGER, DIMENSION(:), ALLOCATABLE :: eind
+      INTEGER, DIMENSION(:), ALLOCATABLE :: elmwgt
       INTEGER, DIMENSION(:), ALLOCATABLE :: intVecTemp
+
+      DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: tpwgts
+      DOUBLE PRECISION, DIMENSION(:), ALLOCATABLE :: ubvec
+
+      INTEGER :: wgtflag, numflag, ncon, ncommonnodes, edgecut, nparts
 
       ! for METIS partitioning
       INTEGER, pointer     :: vwgt=>null(), vsize=>null()
-      DOUBLE PRECISION, pointer     :: tpwgts=>null()
-      INTEGER :: options_metis(100)
+      INTEGER :: options_metis(100), errpar
 
       INTEGER :: ee, ii, jj, kk, ind
       INTEGER :: n1, n2, n3, n4, n5, n6, n7, n8
-      INTEGER :: ncommon_nodes, objval
+
+      INTEGER ::  n_mpi_procs     ! total number of processors in the group
+      INTEGER ::  this_mpi_proc   ! rank of the current processor
+
+      INTEGER ::  nNode_global   ! number of nodes in the whole mesh
+      INTEGER ::  nNode_local    ! number of nodes owned by the local processor
+      INTEGER ::  nElem_global   ! number of global elements (in the whole model)
+      INTEGER ::  nElem_local    ! number of local  elements (owned by the local processor)
+      INTEGER ::  npElem         ! number of nodes per element
+      INTEGER ::  elem_num_start ! starting element in the current processor
+      INTEGER ::  elem_num_end   ! end element in the current processor
 
 
       call CPU_TIME(tstart)
+
+      call MPI_Init(errpar)
+      call MPI_Comm_size(MPI_COMM_WORLD, n_mpi_procs, errpar);
+      call MPI_Comm_rank(MPI_COMM_WORLD, this_mpi_proc, errpar);
+
+      if(n_mpi_procs .EQ. 1) then
+        WRITE(*,*) "This program should be called with at least two processors "
+        STOP "Aborting now ..."
+      end if
+
+      WRITE(charTemp,*) " this_mpi_proc = ", this_mpi_proc, "\n"
+
 
       !Set file names
       !The file names are specified as inputs from the command line
@@ -95,27 +121,24 @@
       READ(arg,*) metisType
 
       CALL getarg(4, arg)
-      READ(arg,*) nParts
-
-      CALL getarg(5, arg)
       infileNodes = arg
 
-      CALL getarg(6, arg)
+      CALL getarg(5, arg)
       infileElems = arg
 
       ! Check element type and set the parameters
       IF(eType == 5) THEN
         npElem = 3
-        ncommon_nodes = 2
+        ncommonnodes = 2
       ELSE IF(eType == 9) THEN
         npElem = 4
-        ncommon_nodes = 2
+        ncommonnodes = 2
       ELSE IF(eType == 10) THEN
         npElem = 4
-        ncommon_nodes = 3
+        ncommonnodes = 3
       ELSE IF(eType == 12) THEN
         npElem = 8
-        ncommon_nodes = 4
+        ncommonnodes = 4
       ELSE
         WRITE(*,*) " Wrong element type"
         STOP "Aborting..."
@@ -152,13 +175,11 @@
 
       IF(ndim == 2) THEN
         DO ii=1,nNode_global
-          READ(1,*, iostat=io) ind,
-     1      coords(ii,1), coords(ii,2)
+          READ(1,*, iostat=io) ind, coords(ii,1), coords(ii,2)
         END DO 
       ELSE
         DO ii=1,nNode_global
-          READ(1,*, iostat=io) ind, 
-     1     coords(ii,1), coords(ii,2), coords(ii,3)
+          READ(1,*, iostat=io) ind, coords(ii,1), coords(ii,2), coords(ii,3)
         END DO 
       END IF
       CLOSE(1)
@@ -223,17 +244,20 @@
       END IF
       CLOSE(2)
 
-      WRITE(*,*) " "
-      WRITE(*,*) " "
-      WRITE(*,*) " Input files have been read successfully "
-      WRITE(*,*) " "
-      WRITE(*,*) " "
-      WRITE(*,*) " Mesh statistics ..... "
-      WRITE(*,*) " Number of elements  = ", nElem_global
-      WRITE(*,*) " Number of nodes     = ", nNode_global
-      WRITE(*,*) " Nodes per element   = ", npElem
-      WRITE(*,*) " "
-      WRITE(*,*) " "
+      if(this_mpi_proc .EQ. 0) then
+        WRITE(*,*) " "
+        WRITE(*,*) " "
+        WRITE(*,*) " Input files have been read successfully "
+        WRITE(*,*) " "
+        WRITE(*,*) " "
+        WRITE(*,*) " Mesh statistics ..... "
+        WRITE(*,*) " Number of elements  = ", nElem_global
+        WRITE(*,*) " Number of nodes     = ", nNode_global
+        WRITE(*,*) " Nodes per element   = ", npElem
+        WRITE(*,*) " "
+        WRITE(*,*) " "
+      end if
+      call MPI_Barrier(MPI_COMM_WORLD, errpar)
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       !!
@@ -243,55 +267,107 @@
 
       WRITE(*,*) " Partitioning the mesh "
 
+      ALLOCATE(elemdist(n_mpi_procs+1))
+      elemdist = 0
       ALLOCATE(elem_proc_id(nElem_global))
       elem_proc_id = 0
       ALLOCATE(node_proc_id(nNode_global))
       node_proc_id = 0
 
-      ! array of size (nElem_global+1) which stores
+      fact = nElem_global/n_mpi_procs
+      ind = ceiling(fact)
+
+      elem_num_start = ind*this_mpi_proc+1
+
+      if(this_mpi_proc .EQ. (n_mpi_procs-1) ) then
+        elem_num_end   = nElem_global
+      else
+        elem_num_end   = ind*(this_mpi_proc+1)
+      end if
+
+      nElem_local = elem_num_end - elem_num_start + 1
+
+      write(*,*) "elem_num_start = ", elem_num_start, this_mpi_proc
+      write(*,*) "elem_num_end   = ", elem_num_end, this_mpi_proc
+      write(*,*) "nElem_local    = ", nElem_local, this_mpi_proc
+
+      do ii=1,n_mpi_procs
+        n1 = ind*(ii-1)+1
+        n2 = ind*ii
+
+        if(ii .EQ. n_mpi_procs ) then
+          n2  = nElem_global
+        end if
+
+        elemdist(ii+1) = elemdist(ii) + n2-n1+1
+
+        do jj=n1,n2
+          elem_proc_id(jj) = ii
+        end do
+      end do
+
+      write(*,*) elemdist
+
+      call MPI_Barrier(MPI_COMM_WORLD, errpar)
+      WRITE(*,*) " Building eptr & eind arrays ", this_mpi_proc
+      ! array of size (nElem_local+1) which stores
       ! number of nodes per each element,
       ! with 0 as the first entry and
-      ! nElem_global*npElem as the last entry
-      ind = nElem_global+1
+      ! nElem_local*npElem as the last entry
+      ind = nElem_local+1
       ALLOCATE( eptr(ind) )
 
-      ! array of size 'nElem_global*npElem'
+      ! array of size 'nElem_local*npElem'
       ! which stores eleme<->node connectivity information
-      ind = nElem_global*npElem
+      ind = nElem_local*npElem
       ALLOCATE( eind(ind) )
 
-      DO ee=1,nElem_global
-        eptr(ee) = (ee-1)*npElem
+      ee=elem_num_start
+      DO ii=1, nElem_local
+        kk = (ii-1)*npElem
 
-        kk = (ee-1)*npElem;
+        eptr(ii) = kk
 
         intVecTemp = elemNodeConn(ee,:)
 
-        DO ii=1, npElem
-          eind(kk+ii) = intVecTemp(ii)-1
+        DO jj=1, npElem
+          eind(kk+jj) = intVecTemp(jj)
         END DO
+        ee = ee+1
       END DO
 
-      eptr(nElem_global+1) = nElem_global*npElem
+      eptr(nElem_local+1) = nElem_local*npElem
 
 
       ! Call the METIS's options and change them if necessary
-      call METIS_SetDefaultOptions(options_metis)
-
+      !call ParMETIS_SetDefaultOptions(options_metis)
+      call MPI_Barrier(MPI_COMM_WORLD, errpar)
       WRITE(*,*) " Before Metis "
 
+      ALLOCATE(elmwgt(nElem_local))
+      elmwgt = 1
+      !
+      wgtflag = 0
+      !
+      numflag = 1
+      !
+      ncon    = 1
+      !
+      nparts  = n_mpi_procs
+      !
+      ALLOCATE(tpwgts(ncon*nparts))
+      fact = 1.0/dble(nparts)
+      tpwgts = fact
+      write(*,*) tpwgts
+      !
+      ALLOCATE(ubvec(ncon))
+      ubvec = 1.05
+
       ! METIS partition routine
-      IF(metisType == 1) THEN
-        call METIS_PartMeshNodal(
-     1      nElem_global, nNode_global, eptr, eind, vwgt, vsize, 
-     2      nParts, tpwgts, options_metis,
-     3      objval, elem_proc_id, node_proc_id);
-      ELSE
-        call METIS_PartMeshDual(
-     1    nElem_global, nNode_global, eptr, eind, vwgt, vsize, 
-     2    ncommon_nodes, nParts, tpwgts, options_metis,
-     3    objval, elem_proc_id, node_proc_id)
-      END IF
+      call ParMETIS_V3_PartMeshKway(elemdist, eptr, eind, elmwgt, wgtflag, numflag, &
+      & ncon, ncommonnodes, nparts, tpwgts, ubvec, &
+      & options_metis, edgecut, node_proc_id, MPI_COMM_WORLD)
+     
 
       WRITE(*,*) " After Metis "
 
@@ -301,12 +377,26 @@
       !   STOP " METIS partition routine FAILED "
       ! END IF
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      !DO ii=1,nElem_global
+        !WRITE(*,*) ii, elem_proc_id(ii)
+      !ENDDO
+      !WRITE(*,*) " "
+      !WRITE(*,*) " "
+      !WRITE(*,*) " "
+      !DO ii=1,nNode_global
+        !WRITE(*,*) ii, node_proc_id(ii)
+      !ENDDO
+      WRITE(*,*) node_proc_id
+      !WRITE(*,*) " "
+      !WRITE(*,*) " "
+      !WRITE(*,*) " "
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      if(this_mpi_proc .eq. 0) then
       WRITE(*,*) "Writing VTK file"
 
-      outfileName="partition-mesh.vtk"
+      outfileName="partition-mesh-parmetis.vtk"
 
       OPEN(11, file=outfileName, STATUS="UNKNOWN", ACTION="WRITE")
 
@@ -325,13 +415,11 @@
       fact=0.0
       IF (ndim == 2) THEN
         DO ii=1,nNode_global
-          WRITE(11,'(F12.6,F12.6,F12.6)')
-     1      coords(ii,1), coords(ii,2), fact
+          WRITE(11,'(F12.6,F12.6,F12.6)')  coords(ii,1), coords(ii,2), fact
         END DO
       ELSE
         DO ii=1,nNode_global
-          WRITE(11,'(F12.6,F12.6,F12.6)')
-     1     coords(ii,1), coords(ii,2), coords(ii,3)
+          WRITE(11,'(F12.6,F12.6,F12.6)')  coords(ii,1), coords(ii,2), coords(ii,3)
         END DO
       END IF
 
@@ -347,20 +435,17 @@
           ! Triangular element
           n1 = 5
           DO ee=1,nElem_global
-            WRITE(11,'(I10,I10,I10,I10)') npElem,
-     1      elemNodeConn(ee,1)-1,
-     2      elemNodeConn(ee,2)-1,
-     3      elemNodeConn(ee,3)-1
+            WRITE(11,'(I10,I10,I10,I10)') npElem,  &
+            & elemNodeConn(ee,1)-1, &
+            & elemNodeConn(ee,2)-1, &
+            & elemNodeConn(ee,3)-1
           END DO
         ELSE
           ! Quadrilateral element
           n1 = 9
           DO ee=1,nElem_global
-            WRITE(11,'(I10,I10,I10,I10,I10)') npElem,
-     1      elemNodeConn(ee,1)-1,
-     2      elemNodeConn(ee,2)-1,
-     3      elemNodeConn(ee,4)-1,
-     4      elemNodeConn(ee,3)-1
+            WRITE(11,'(I10,I10,I10,I10,I10)') npElem, elemNodeConn(ee,1)-1, & 
+            & elemNodeConn(ee,2)-1, elemNodeConn(ee,4)-1, elemNodeConn(ee,3)-1
           END DO
         END IF
       ELSE
@@ -368,25 +453,16 @@
           ! Tetrahedral element
           n1 = 10
           DO ee=1,nElem_global
-            WRITE(11,'(I6,I12,I12,I12,I12)') npElem,
-     1      elemNodeConn(ee,1)-1,
-     2      elemNodeConn(ee,2)-1,
-     3      elemNodeConn(ee,3)-1,
-     4      elemNodeConn(ee,4)-1
+            WRITE(11,'(I6,I12,I12,I12,I12)') npElem, elemNodeConn(ee,1)-1, &
+            & elemNodeConn(ee,2)-1, elemNodeConn(ee,3)-1, elemNodeConn(ee,4)-1
           END DO
         ELSE
           ! Hexahedral element
           n1 = 12
           DO ee=1,nElem_global
-            WRITE(11,'(I6,I12,I12,I12,I12,I12,I12,I12,I12)') npElem,
-     1      elemNodeConn(ee,1)-1,
-     2      elemNodeConn(ee,2)-1,
-     3      elemNodeConn(ee,4)-1,
-     4      elemNodeConn(ee,3)-1,
-     5      elemNodeConn(ee,5)-1,
-     6      elemNodeConn(ee,6)-1,
-     7      elemNodeConn(ee,8)-1,
-     8      elemNodeConn(ee,7)-1
+            WRITE(11,'(I6,I12,I12,I12,I12,I12,I12,I12,I12)') npElem, elemNodeConn(ee,1)-1, &
+            & elemNodeConn(ee,2)-1, elemNodeConn(ee,4)-1, elemNodeConn(ee,3)-1, &
+            & elemNodeConn(ee,5)-1, elemNodeConn(ee,6)-1, elemNodeConn(ee,8)-1, elemNodeConn(ee,7)-1
           END DO
         END IF
       END IF
@@ -407,6 +483,7 @@
 
       ! close the file
       CLOSE(11)
+      end if
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -419,7 +496,8 @@
       IF( ALLOCATED(node_proc_id) )  DEALLOCATE(node_proc_id)
       IF( ALLOCATED(eptr) )          DEALLOCATE(eptr)
       IF( ALLOCATED(eind) )          DEALLOCATE(eind)
-
+      if( ALLOCATED(tpwgts) )        DEALLOCATE(tpwgts)
+      if( ALLOCATED(ubvec) )         DEALLOCATE(ubvec)
 
       call CPU_TIME(tend)
       WRITE(*,*) "That took ", (tend-tstart), "seconds"
@@ -429,5 +507,7 @@
       WRITE(*,*) "Program is successful"
       WRITE(*,*) " "
       WRITE(*,*) " "
+
+      call MPI_Finalize(errpar)
 
       END PROGRAM MeshPartition

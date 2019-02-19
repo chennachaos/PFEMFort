@@ -13,14 +13,11 @@
 
 # --- compiler settings -----------------------------------
 
-VPATH  =  ../src
-
-
 VTKLIB62 = /usr/lib/x86_64-linux-gnu  -lvtkCommonCore-6.2  -lvtkIOCore-6.2  -lvtkIOGeometry-6.2  -lvtkIOXML-6.2 -lvtkIOImage-6.2 -lvtkIOExport-6.2 \
          -lvtkRenderingCore-6.2   -lvtkFiltersCore-6.2  -lvtkFiltersGeneral-6.2    -lvtkFiltersModeling-6.2  -lvtkFiltersSources-6.2  \
          -lvtkRenderingAnnotation-6.2  -lvtkRenderingVolume-6.2  -lvtkRenderingVolumeOpenGL-6.2  -lvtkRenderingFreeTypeOpenGL-6.2 \
          -lvtkInteractionStyle-6.2   -lvtkIOParallel-6.2  -lvtkIOParallelXML-6.2  -lvtkCommonExecutionModel-6.2  -lvtkCommonDataModel-6.2 \
-	 -lvtkRenderingOpenGL-6.2  -lvtkRenderingFreeType-6.2 -lvtkIOLegacy-6.2
+		 -lvtkRenderingOpenGL-6.2  -lvtkRenderingFreeType-6.2 -lvtkIOLegacy-6.2
 
 CC = gcc 
 
@@ -28,8 +25,8 @@ COPT  = -std=c++11 -O3 -Wno-uninitialized -Wno-sign-compare -Wno-write-strings  
 
 
 CINCL = -I /usr/include/vtk-6.2 \
-	-I /usr/include/petsc \
-	-I /usr/include/openmpi  
+		-I /usr/include/petsc \
+		-I /usr/include/openmpi  
 
 CLIB  = -L/usr/lib/gcc/x86_64-linux-gnu/5.4.0 -lstdc++ -lgfortran -fopenmp -lgomp -lpthread -lm  \
         -L$(VTKLIB62) \
@@ -56,8 +53,6 @@ OBJECTS = writervtk.o solverpetsc.o elementutilitiesbasisfuncs.o elementutilitie
 
 # --- commands -------------------------------------------------------
 
-#include makedepslist
-
 %.o ../obj/%.o: %.cpp
 	$(CC) -c $(COPT) $(CINCL) $< -o $@
 
@@ -70,11 +65,8 @@ OBJECTS = writervtk.o solverpetsc.o elementutilitiesbasisfuncs.o elementutilitie
 %.o ../obj/%.o: %.f
 	$(CF) -c $(FOPT) $(FINCL) $< -o $@
 
-#%.o %.mod: %.F
-%.o: %.F
+%.o ../obj/%.o: %.F
 	$(CF) -c $(FOPT) $(FINCL) $< -o $@
-#	mv $@ ../obj
-#	mv *.mod ../obj
 
 
 vtktovtu: vtktovtu.o
@@ -88,10 +80,6 @@ meshpartitioncpp: writervtk.o meshpartitioncpp.o
 meshpartitionfort: writervtk.o meshpartitionfort.o
 	${CF} -o meshpartitionfort meshpartitionfort.o writervtk.o ${FLIB}
 	rm  meshpartitionfort.o
-
-meshpartitionfortparmetis: writervtk.o meshpartitionfortparmetis.o
-	${CF} -o meshpartitionfortparmetis meshpartitionfortparmetis.o writervtk.o ${FLIB}
-	rm  meshpartitionfortparmetis.o
 
 triapoissonserialimpl1: writervtk.o triapoissonserialimpl1.o ${OBJECTS}
 	${CF} -o triapoissonserialimpl1 triapoissonserialimpl1.o writervtk.o ${FLIB}
@@ -124,10 +112,6 @@ triaelasticityparallelimpl1: ${OBJECTS} triaelasticityparallelimpl1.o
 tetraelasticityparallelimpl1: ${OBJECTS} tetraelasticityparallelimpl1.o
 	${CF} -o tetraelasticityparallelimpl1 tetraelasticityparallelimpl1.o ${OBJECTS} ${FLIB}
 	rm  tetraelasticityparallelimpl1.o
-
-meshpartitioncpp: writervtk.o meshpartitioncpp.o
-	${CC} -o meshpartitioncpp meshpartitioncpp.o writervtk.o ${CLIB}
-	rm  meshpartitioncpp.o
 
 clean:
 	rm *.o
