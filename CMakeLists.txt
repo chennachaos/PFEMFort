@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.0)
 
 project (ParallelFortran)
 
-enable_language(Fortran)
+enable_language(CXX Fortran)
 
 
 
@@ -29,7 +29,7 @@ set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}")
 ##################################
 #include_directories(/usr/include/petsc)
 include_directories(
-/usr/include/vtk-6.2  /usr/include/openmpi  /usr/include/petsc  /usr/include/superlu  /usr/include/boost)
+/usr/include/vtk-6.3  /usr/include/openmpi  /usr/include/petsc  /usr/include/superlu  /usr/include/boost)
 
 
 ##################################
@@ -37,36 +37,39 @@ include_directories(
 ##################################
 #link_directories(/usr/lib/gcc/x86_64-linux-gnu /usr/lib /opt/petsc-3.6.4/arch-linux2-c-debug/lib)
 link_directories(
-/usr/lib/gcc/x86_64-linux-gnu/5.4.0
-/usr/lib/x86_64-linux-gnu
+/usr/lib/gcc/x86_64-linux-gnu/7.5.0
 /usr/lib/libblas
 /usr/lib/lapack 
-/opt/petsc-3.6.4/arch-linux2-c-debug/lib 
-/usr/lib 
+/opt/petsc-3.6.4/arch-linux2-c-debug/lib
 /home/chenna/Documents/myCode/igampap/lib  
-/usr/lib/x86_64-linux-gnu  
 /usr/x86_64-linux-gnu/lib
+/usr/lib/openmpi/lib
+/usr/lib/x86_64-linux-gnu
 )
 
 
 
 #src/elemutilitiesquadrature.F 
-#file(GLOB_RECURSE sources src/elemutilitiesquadrature.F src/elementutilitiesbasisfuncs.F src/elementutilitiespoisson.F src/elementutilitieselasticity2D.F elementutilitieselasticity3D.F src/writervtk.F src/solverpetsc.F)
+file(GLOB_RECURSE sources src/elemutilitiesquadrature.F src/elementutilitiesbasisfuncs.F src/elementutilitiespoisson.F src/elementutilitieselasticity2D.F elementutilitieselasticity3D.F src/writervtk.F src/solverpetsc.F)
 
 ##################################
 
-add_executable(partmeshfort src/meshpartitionfort.F)
-#add_executable(partmeshfortparmetis src/meshpartitionfortparmetis.f90)
-add_executable(parmetisdualtest src/parmetisdualtest.F)
+#add_executable(partmeshfort src/meshpartitionfort.F)
+#add_executable(partmeshparmetisfort src/meshpartitionfortparmetis.f90)
+add_executable(partmeshparmetiscpp src/meshpartitionfortparmetis.cpp)
+#add_executable(parmetisdualtest src/parmetisdualtest.F)
 
 
-target_link_libraries(partmeshfort metis)
+#target_link_libraries(partmeshfort metis)
 #target_link_libraries(partmeshfortparmetis mpi_mpifh parmetis)
-target_link_libraries(parmetisdualtest mpi_mpifh parmetis)
+target_link_libraries(partmeshparmetiscpp mpi mpi_cxx metis parmetis petsc)
+#target_link_libraries(parmetisdualtest mpi_mpifh parmetis)
 
-install(TARGETS partmeshfort RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-#install(TARGETS partmeshfortparmetis RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-install(TARGETS parmetisdualtest RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
+#install(TARGETS partmeshfort RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS partmeshfortparmetis RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS parmetisdualtest RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+install(TARGETS partmeshparmetiscpp RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+
 
 #add_library(writer writervtk.F)
 #add_executable(writer writervtk.F)
@@ -90,16 +93,18 @@ install(TARGETS parmetisdualtest RUNTIME DESTINATION /home/chenna/Documents/myCo
 #target_link_libraries(elasticityexplicitquad metis petsc mpi mpi_mpifh)
 #target_link_libraries(elasticityexplicitprism metis petsc mpi mpi_mpifh)
 #target_link_libraries(elasticityexplicittria6 metis petsc mpi mpi_mpifh)
-
 #target_link_libraries(elasticityexplicit3d metis petsc mpi mpi_mpifh)
 
+#target_link_libraries(tetraelasticity metis petsc mpi mpi_mpifh)
 
-#install(TARGETS triapoisson RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-#install(TARGETS elasticityexplicittria RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-#install(TARGETS elasticityexplicitquad RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-#install(TARGETS elasticityexplicitprism RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
-#install(TARGETS elasticityexplicittria6 RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/standardfem/bin)
 
+#install(TARGETS triapoisson RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS elasticityexplicittria RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS elasticityexplicitquad RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS elasticityexplicitprism RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+#install(TARGETS elasticityexplicittria6 RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
+
+#install(TARGETS tetraelasticity RUNTIME DESTINATION /home/chenna/Documents/myCode/Fortran/PFEMFort/bin)
 
 
 

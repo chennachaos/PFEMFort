@@ -44,11 +44,11 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    PetscErrorCode ierr;
+    PetscErrorCode errpetsc;
   
     // initialise PETSc. This will internally initialises MPI  environment
-    ierr = PetscInitialize(&argc, &argv, (char *)0, NULL); CHKERRQ(ierr);
-    //ierr = PetscInitialize(NULL, NULL, "petsc_options.dat", NULL); CHKERRQ(ierr);
+    errpetsc = PetscInitialize(&argc, &argv, (char *)0, NULL); CHKERRQ(errpetsc);
+    //errpetsc = PetscInitialize(NULL, NULL, "petsc_options.dat", NULL); CHKERRQ(errpetsc);
   
     //////////////////////////////////////////////
     //
@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
     procIdVTK->Reset();
     nodeInOutVTK->Reset();
 
-    int  ndim, eType, metisType, node_proc_ids, ncommon_nodes;
+    int  ndim, eType, metisType, nparts, ncommon_nodes;
     int  nNode, nElem, npElem, count, ind;
     int  ee, ii, jj, kk, e1, e2, ind1, ind2;
     string nodeFileName, elemFileName;
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
        ndim      = atoi(argv[1]);
        eType     = atoi(argv[2]);
        metisType = atoi(argv[3]);
-       node_proc_ids    = atoi(argv[4]);
+       nparts    = atoi(argv[4]);
 
        nodeFileName = argv[5];
        elemFileName = argv[6];
@@ -283,16 +283,16 @@ int main(int argc, char* argv[])
 
       PetscInt  *eptr, *eind, *elem_proc_id, *node_proc_id;
 
-      ierr  = PetscMalloc1(nElem+1,       &eptr);  CHKERRQ(ierr);
-      ierr  = PetscMalloc1(nElem,         &elem_proc_id); CHKERRQ(ierr);
-      ierr  = PetscMalloc1(nNode,         &node_proc_id); CHKERRQ(ierr);
+      errpetsc  = PetscMalloc1(nElem+1,       &eptr);  CHKERRQ(errpetsc);
+      errpetsc  = PetscMalloc1(nElem,         &elem_proc_id); CHKERRQ(errpetsc);
+      errpetsc  = PetscMalloc1(nNode,         &node_proc_id); CHKERRQ(errpetsc);
 
 
       idx_t npElem_total = nElem*npElem;
 
       cout << " npElem_total = " << npElem_total << endl;
 
-      ierr  = PetscMalloc1(npElem_total,  &eind); CHKERRQ(ierr);
+      errpetsc  = PetscMalloc1(npElem_total,  &eind); CHKERRQ(errpetsc);
 
       vector<int>  vecTemp2(npElem);
 
@@ -336,28 +336,28 @@ int main(int argc, char* argv[])
       // METIS partition routine
       int ret;
       if(metisType == 1)
-        ret = METIS_PartMeshNodal(&nElem, &nNode, eptr, eind, NULL, NULL, &node_proc_ids, NULL, options, &objval, elem_proc_id, node_proc_id);
+        ret = METIS_PartMeshNodal(&nElem, &nNode, eptr, eind, NULL, NULL, &nparts, NULL, options, &objval, elem_proc_id, node_proc_id);
       else
-        ret = METIS_PartMeshDual(&nElem, &nNode, eptr, eind, NULL, NULL, &ncommon_nodes, &node_proc_ids, NULL, options, &objval, elem_proc_id, node_proc_id);
+        ret = METIS_PartMeshDual(&nElem, &nNode, eptr, eind, NULL, NULL, &ncommon_nodes, &nparts, NULL, options, &objval, elem_proc_id, node_proc_id);
 
       if(ret == METIS_OK)
         cout << " METIS partition routine successful "  << endl;
       else
         cout << " METIS partition routine FAILED "  << endl;
 
-      //for(ee=0; ee<nNode; ee++)
-        //cout << ee << '\t' << node_proc_id[ee] << endl;
+      for(ee=0; ee<nNode; ee++)
+        cout << ee << '\t' << node_proc_id[ee] << endl;
 
       for(ee=0; ee<nElem; ee++)
       {
-        // cout << ee << '\t' << elem_proc_id[ee] << endl;
+        cout << ee << '\t' << elem_proc_id[ee] << endl;
         procIdVTK->InsertTuple1(ee, elem_proc_id[ee]);
       }
 
-      ierr  = PetscFree(eptr);  CHKERRQ(ierr);
-      ierr  = PetscFree(eind);  CHKERRQ(ierr);
-      ierr  = PetscFree(elem_proc_id); CHKERRQ(ierr);
-      ierr  = PetscFree(node_proc_id); CHKERRQ(ierr);
+      errpetsc  = PetscFree(eptr);  CHKERRQ(errpetsc);
+      errpetsc  = PetscFree(eind);  CHKERRQ(errpetsc);
+      errpetsc  = PetscFree(elem_proc_id); CHKERRQ(errpetsc);
+      errpetsc  = PetscFree(node_proc_id); CHKERRQ(errpetsc);
 
     /////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////
@@ -441,7 +441,7 @@ int main(int argc, char* argv[])
       writerUGridVTK->Write();
 
     // finalise  PETSc. This will internally finalises MPI  environment       //MPI_Finalize();
-    ierr = PetscFinalize();CHKERRQ(ierr);
+    errpetsc = PetscFinalize();CHKERRQ(errpetsc);
 
     return 0;
 }

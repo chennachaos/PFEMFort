@@ -267,6 +267,7 @@ include "mpif.h"
 
       WRITE(*,*) " Partitioning the mesh "
 
+
       ALLOCATE(elemdist(n_mpi_procs+1))
       elemdist = 0
       ALLOCATE(elem_proc_id(nElem_global))

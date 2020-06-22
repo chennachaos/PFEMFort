@@ -70,63 +70,22 @@ OBJECTS = writervtk.o solverpetsc.o elementutilitiesbasisfuncs.o elementutilitie
 %.o ../obj/%.o: %.f
 	$(CF) -c $(FOPT) $(FINCL) $< -o $@
 
-#%.o %.mod: %.F
-%.o: %.F
+%.o ../obj/%.o: %.F
 	$(CF) -c $(FOPT) $(FINCL) $< -o $@
-#	mv $@ ../obj
-#	mv *.mod ../obj
 
+%.o %.mod: %.F
+#%.o: %.F
+	$(CF) -c $(FOPT) $(FINCL) $< -o $@
+	mv $@ ../obj
+	mv *.mod ../obj
 
-vtktovtu: vtktovtu.o
-	${CC} -o vtktovtu vtktovtu.o ${CLIB}
-	rm  vtktovtu.o
-
-meshpartitioncpp: writervtk.o meshpartitioncpp.o
-	${CC} -o meshpartitioncpp meshpartitioncpp.o writervtk.o ${CLIB}
-	rm  meshpartitioncpp.o
-
-meshpartitionfort: writervtk.o meshpartitionfort.o
-	${CF} -o meshpartitionfort meshpartitionfort.o writervtk.o ${FLIB}
-	rm  meshpartitionfort.o
-
-meshpartitionfortparmetis: writervtk.o meshpartitionfortparmetis.o
-	${CF} -o meshpartitionfortparmetis meshpartitionfortparmetis.o writervtk.o ${FLIB}
-	rm  meshpartitionfortparmetis.o
-
-triapoissonserialimpl1: writervtk.o triapoissonserialimpl1.o ${OBJECTS}
-	${CF} -o triapoissonserialimpl1 triapoissonserialimpl1.o writervtk.o ${FLIB}
-	rm  triapoissonserialimpl1.o
-
-triapoissonserialimpl2: writervtk.o triapoissonserialimpl2.o
-	${CF} -o triapoissonserialimpl2 triapoissonserialimpl2.o writervtk.o ${FLIB}
-	rm  triapoissonserialimpl2.o
-
-triapoissonserialimpl3: writervtk.o solverpetsc.o triapoissonserialimpl3.o
-	${CF} -o triapoissonserialimpl3 triapoissonserialimpl3.o ${OBJECTS} ${FLIB}
-	rm  triapoissonserialimpl3.o
-
-triapoissonparallelimpl1: ${OBJECTS} triapoissonparallelimpl1.o 
-	${CF} -o triapoissonparallelimpl1 triapoissonparallelimpl1.o ${OBJECTS} ${FLIB}
-	rm  triapoissonparallelimpl1.o
-
-triapoissonparallelimpl2: ${OBJECTS} triapoissonparallelimpl2.o 
-	${CF} -o triapoissonparallelimpl2 triapoissonparallelimpl2.o ${OBJECTS} ${FLIB}
-	rm  triapoissonparallelimpl2.o
-
-tetrapoissonparallelimpl1: ${OBJECTS} tetrapoissonparallelimpl1.o 
-	${CF} -o tetrapoissonparallelimpl1 tetrapoissonparallelimpl1.o ${OBJECTS} ${FLIB}
-	rm  tetrapoissonparallelimpl1.o
-
-triaelasticityparallelimpl1: ${OBJECTS} triaelasticityparallelimpl1.o
-	${CF} -o triaelasticityparallelimpl1 triaelasticityparallelimpl1.o ${OBJECTS} ${FLIB}
-	rm  triaelasticityparallelimpl1.o
 
 tetraelasticityparallelimpl1: ${OBJECTS} tetraelasticityparallelimpl1.o
 	${CF} -o tetraelasticityparallelimpl1 tetraelasticityparallelimpl1.o ${OBJECTS} ${FLIB}
 	rm  tetraelasticityparallelimpl1.o
 
-meshpartitioncpp: writervtk.o meshpartitioncpp.o
-	${CC} -o meshpartitioncpp meshpartitioncpp.o writervtk.o ${CLIB}
+meshpartitioncpp: meshpartitioncpp.o
+	${CC} -o meshpartitioncpp meshpartitioncpp.o ${CLIB}
 	rm  meshpartitioncpp.o
 
 clean:

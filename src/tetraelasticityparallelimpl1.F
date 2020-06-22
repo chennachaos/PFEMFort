@@ -19,7 +19,7 @@
 
       PROGRAM TetraMeshElasticityEquation
 
-      USE ElementUtilitiesElasticity
+      USE ElementUtilitiesElasticity3D
       USE WriterVTK
       USE Module_SolverPetsc
 
@@ -122,8 +122,8 @@
 
       PetscInt elem_start   ! starting element in the current processor
       PetscInt elem_end     ! end element in the current processor
-      PetscInt size_global  ! total number of global DOF in the whole model
-      PetscInt size_local   ! total number of local DOF owned by the current processor
+      PetscInt ntotdofs_global  ! total number of global DOF in the whole model
+      PetscInt ntotdofs_local   ! total number of local DOF owned by the current processor
       !
       ! Petsc stores matrices continuous row-wise owned by each processor
       PetscInt node_start   ! number of the first nodes owned by the current processor
@@ -419,17 +419,17 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      size_global = 1
+      ntotdofs_global = 1
       DO ii=1,nNode_global
         DO jj=1,ndof
           IF(NodeTypeOld(ii,jj) == 0) THEN
-            NodeDofArrayOld(ii,jj) = size_global
-            size_global = size_global + 1
+            NodeDofArrayOld(ii,jj) = ntotdofs_global
+            ntotdofs_global = ntotdofs_global + 1
           END IF
         END DO
       END DO
 
-      size_global = size_global-1
+      ntotdofs_global = ntotdofs_global-1
 
 
       WRITE(charTemp,*) " Mesh statistics .....\n"
@@ -442,7 +442,7 @@
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
       WRITE(charTemp,*) " ndof           = ", ndof, "\n"
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
-      WRITE(charTemp,*) " Total DOF      = ", size_global, "\n"
+      WRITE(charTemp,*) " Total DOF      = ", ntotdofs_global, "\n"
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
 
       call MPI_Barrier(PETSC_COMM_WORLD, errpetsc)
@@ -463,13 +463,13 @@
 
       IF(n_mpi_procs == 1) THEN
         nElem_local = nElem_global
-        size_local  = size_global
+        ntotdofs_local  = ntotdofs_global
 
         node_start = 1
         node_end   = nNode_global
 
         row_start = 1
-        row_end   = size_global
+        row_end   = ntotdofs_global
 
         ! WRITE(*,*) " elem_start = ", this_mpi_proc, elem_start, elem_end
 
@@ -578,7 +578,7 @@
         ALLOCATE( nNode_local_vector(n_mpi_procs) )
 
         call MPI_Allgather(nNode_local, 1, MPI_INT, 
-     1    nNode_local_vector, 1, MPI_INT, 
+     1    nNode_local_vector, n_mpi_procs, 1, MPI_INT, 
      2    PETSC_COMM_WORLD, errpetsc)
 
         ! compute the numbers of first and last nodes
@@ -676,7 +676,7 @@
 
         ind = ind-1
 
-        IF(ind /= size_global) THEN
+        IF(ind /= ntotdofs_global) THEN
           STOP "Something wrong with NodeDofArrayNew"
         END IF
 
@@ -691,22 +691,22 @@
         ! of the rows owned by the local processor
         row_start  =  1e9
         row_end    = -1e9
-        size_local = 1
+        ntotdofs_local = 1
         DO ii=node_start, node_end
           DO jj=1,ndof
             IF(NodeTypeNew(ii,jj) == 0) THEN
               ind = NodeDofArrayNew(ii,jj)
               row_start  = MIN(row_start, ind)
               row_end    = MAX(row_end,   ind)
-              size_local = size_local + 1
+              ntotdofs_local = ntotdofs_local + 1
             END IF
           END DO
         END DO
 
-        size_local = size_local - 1
+        ntotdofs_local = ntotdofs_local - 1
 
-        WRITE(charTemp,*) "size_local = ",
-     1    this_mpi_proc, size_local, size_global, "\n"
+        WRITE(charTemp,*) "ntotdofs_local = ",
+     1    this_mpi_proc, ntotdofs_local, ntotdofs_global, "\n"
         call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
 
         WRITE(*,*) "row_start = ", this_mpi_proc, row_start, row_end
@@ -718,10 +718,10 @@
         ! is equal to that of global problem size
 
         ind=0
-        call MPI_Allreduce(size_local, ind, 1, MPI_INT, MPI_SUM,
+        call MPI_Allreduce(ntotdofs_local, ind, 1, MPI_INT, MPI_SUM,
      1         PETSC_COMM_WORLD, errpetsc)
         
-        IF(ind /= size_global) THEN
+        IF(ind /= ntotdofs_global) THEN
           STOP "Sum of local problem sizes is not equal to global size"
         END IF
 
@@ -790,7 +790,7 @@
       ! END DO
 
       ! write(*,*) " Creating arrays 2 "
-      ALLOCATE(assyForSoln(size_global))
+      ALLOCATE(assyForSoln(ntotdofs_global))
       ! write(*,*) " Creating arrays 2 "
 
       count = 1
@@ -814,8 +814,8 @@
       ! create PETSc variables
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      WRITE(charTemp,*) " size_local  = ",
-     1  this_mpi_proc, size_local, "\n"
+      WRITE(charTemp,*) " ntotdofs_local  = ",
+     1  this_mpi_proc, ntotdofs_local, "\n"
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
 
       ! write(*,*) " Creating PETSc vectors 1"
@@ -827,18 +827,18 @@
       ! We might need to revisit this piece of code
       ! in the future
 
-      ALLOCATE(diag_nnz(size_local))
-      ALLOCATE(offdiag_nnz(size_local))
+      ALLOCATE(diag_nnz(ntotdofs_local))
+      ALLOCATE(offdiag_nnz(ntotdofs_local))
 
       n1 = 50; n2 = 25
-      IF(size_local < 50) THEN
-        n1 = size_local
+      IF(ntotdofs_local < 50) THEN
+        n1 = ntotdofs_local
         n2 = n1
       END IF
 
       ! write(*,*) "n1, n2 = ", this_mpi_proc, n1, n2
 
-      DO ii=1,size_local
+      DO ii=1,ntotdofs_local
         diag_nnz(ii) = n1
         offdiag_nnz(ii) = n2
       END DO
@@ -847,7 +847,7 @@
      1 " Initialising petsc solver \n", errpetsc)
 
       !Initialize the petsc solver
-      call solverpetsc%initialise(size_local, size_global,
+      call solverpetsc%initialise(ntotdofs_local, ntotdofs_global,
      1  diag_nnz, offdiag_nnz)
 
       call PetscPrintf(PETSC_COMM_WORLD, 
@@ -1031,7 +1031,7 @@
       IF(this_mpi_proc == 0) THEN
         OPEN(1, file="temp.dat", STATUS="UNKNOWN", ACTION="WRITE")
 
-        DO ii=1,size_global
+        DO ii=1,ntotdofs_global
           fact = xx_v(xx_i+ii)
 
           ind = assyForSoln(ii)
