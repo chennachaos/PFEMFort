@@ -578,7 +578,7 @@
         ALLOCATE( nNode_local_vector(n_mpi_procs) )
 
         call MPI_Allgather(nNode_local, 1, MPI_INT, 
-     1    nNode_local_vector, n_mpi_procs, 1, MPI_INT, 
+     1    nNode_local_vector, 1, MPI_INT, 
      2    PETSC_COMM_WORLD, errpetsc)
 
         ! compute the numbers of first and last nodes

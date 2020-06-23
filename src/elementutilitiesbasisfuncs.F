@@ -262,23 +262,23 @@
 
           N(1) = xi1;
           N(2) = xi2;
-          N(3) = xi3;
-          N(4) = 1.0 - xi1 - xi2 - xi3;
+          N(3) = 1.0 - xi1 - xi2 - xi3;
+          N(4) = xi3;
 
           dN_dxi1(1) =  1.0;
           dN_dxi1(2) =  0.0;
-          dN_dxi1(3) =  0.0;
-          dN_dxi1(4) = -1.0;
+          dN_dxi1(4) =  0.0;
+          dN_dxi1(3) = -1.0;
 
           dN_dxi2(1) =  0.0;
           dN_dxi2(2) =  1.0;
-          dN_dxi2(3) =  0.0;
-          dN_dxi2(4) = -1.0;
+          dN_dxi2(4) =  0.0;
+          dN_dxi2(3) = -1.0;
 
           dN_dxi3(1) =  0.0;
           dN_dxi3(2) =  0.0;
-          dN_dxi3(3) =  1.0;
-          dN_dxi3(4) = -1.0;
+          dN_dxi3(4) =  1.0;
+          dN_dxi3(3) = -1.0;
 
       CASE DEFAULT
 

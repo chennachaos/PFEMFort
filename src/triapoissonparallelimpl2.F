@@ -158,7 +158,8 @@
       CHARACTER (LEN=100) :: infileElems
       CHARACTER (LEN=100) :: infileDBCs
       CHARACTER (LEN=100) :: charTemp
-      
+      CHARACTER (LEN=100) :: outFileName
+
       !Set file names
       !The file names are specified as inputs from the command line
       IF( iargc() < 3 ) THEN
@@ -184,7 +185,7 @@
 
       CALL getarg(1, arg)
       infileNodes = arg
-      infileNodes = trim(infileNodes) // (this_mpi_proc+1)
+      !infileNodes = trim(infileNodes) // (this_mpi_proc+1)
       READ(arg,*) charTemp
       charTemp = trim(charTemp) // "\n"
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
@@ -192,7 +193,7 @@
 
       CALL getarg(2, arg)
       infileElems = arg
-      infileElems = trim(infileElems) // (this_mpi_proc+1)
+      !infileElems = trim(infileElems) // (this_mpi_proc+1)
       READ(arg,*) charTemp
       charTemp = trim(charTemp) // "\n"
       call PetscPrintf(PETSC_COMM_WORLD, charTemp, errpetsc)
@@ -983,6 +984,8 @@
         END DO
       END DO
 
+      WRITE(outFileName,'(A,I5.5,A)') "PoissonTria-soln.vtk"
+
       ! write the solution to the VTK file
       IF(this_mpi_proc == 0) THEN
         write(*,*) "Writing VTK file"
@@ -995,7 +998,8 @@
      6     coords,
      7     elemNodeConn,
      8     elem_procid,
-     9     solnVTK)
+     9     solnVTK,
+     +     outFileName)
       END IF
 
       call PetscPrintf(PETSC_COMM_WORLD, 

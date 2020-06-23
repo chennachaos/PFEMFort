@@ -123,7 +123,7 @@
       DOUBLE PRECISION :: area, timefact, af, Jac, dvol, force
       DOUBLE PRECISION :: N(4), dN_dx(4), dN_dy(4), dN_dz(4)
 
-      INTEGER :: degree=1, type=1, nlbf=4, nGP=1, gp, ii, jj
+      INTEGER :: degree=1, type=4, nlbf=4, nGP=1, gp, ii, jj
 
       DOUBLE PRECISION :: gpts1(1), gpts2(1), gpts3(1)
       DOUBLE PRECISION :: gwts(1), param(3)

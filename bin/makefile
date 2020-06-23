@@ -13,20 +13,23 @@
 
 # --- compiler settings -----------------------------------
 
-VTKLIB62 = /usr/lib/x86_64-linux-gnu  -lvtkCommonCore-6.2  -lvtkIOCore-6.2  -lvtkIOGeometry-6.2  -lvtkIOXML-6.2 -lvtkIOImage-6.2 -lvtkIOExport-6.2 \
-         -lvtkRenderingCore-6.2   -lvtkFiltersCore-6.2  -lvtkFiltersGeneral-6.2    -lvtkFiltersModeling-6.2  -lvtkFiltersSources-6.2  \
-         -lvtkRenderingAnnotation-6.2  -lvtkRenderingVolume-6.2  -lvtkRenderingVolumeOpenGL-6.2  -lvtkRenderingFreeTypeOpenGL-6.2 \
-         -lvtkInteractionStyle-6.2   -lvtkIOParallel-6.2  -lvtkIOParallelXML-6.2  -lvtkCommonExecutionModel-6.2  -lvtkCommonDataModel-6.2 \
-		 -lvtkRenderingOpenGL-6.2  -lvtkRenderingFreeType-6.2 -lvtkIOLegacy-6.2
+VPATH  =  ../src
+
+
+VTKLIB62 = /usr/lib/x86_64-linux-gnu  -lvtkCommonCore-6.3  -lvtkIOCore-6.3  -lvtkIOGeometry-6.3  -lvtkIOXML-6.3 -lvtkIOImage-6.3 -lvtkIOExport-6.3 \
+         -lvtkRenderingCore-6.3   -lvtkFiltersCore-6.3  -lvtkFiltersGeneral-6.3    -lvtkFiltersModeling-6.3  -lvtkFiltersSources-6.3  \
+         -lvtkRenderingAnnotation-6.3  -lvtkRenderingVolume-6.3  -lvtkRenderingVolumeOpenGL-6.3 \
+         -lvtkInteractionStyle-6.3   -lvtkIOParallel-6.3  -lvtkIOParallelXML-6.3  -lvtkCommonExecutionModel-6.3  -lvtkCommonDataModel-6.3 \
+	 -lvtkRenderingOpenGL-6.3  -lvtkRenderingFreeType-6.3 -lvtkIOLegacy-6.3
 
 CC = gcc 
 
 COPT  = -std=c++11 -O3 -Wno-uninitialized -Wno-sign-compare -Wno-write-strings  -Wno-deprecated  -Wno-unused  -Wno-format -Wno-narrowing  -Wno-reorder  -Wreturn-type -fpermissive -frounding-math
 
 
-CINCL = -I /usr/include/vtk-6.2 \
-		-I /usr/include/petsc \
-		-I /usr/include/openmpi  
+CINCL = -I /usr/include/vtk-6.3 \
+	-I /usr/include/petsc \
+	-I /usr/include/openmpi  
 
 CLIB  = -L/usr/lib/gcc/x86_64-linux-gnu/5.4.0 -lstdc++ -lgfortran -fopenmp -lgomp -lpthread -lm  \
         -L$(VTKLIB62) \
@@ -47,11 +50,13 @@ FLIB  = -L /usr/include/petsc \
 
 # --- obj file list
 
-OBJECTS = writervtk.o solverpetsc.o elementutilitiesbasisfuncs.o elementutilitiespoisson.o elementutilitieselasticity.o
+OBJECTS = writervtk.o solverpetsc.o elemutilitiesquadrature.o elementutilitiesbasisfuncs.o elementutilitiespoisson.o elementutilitieselasticity2D.o  elementutilitieselasticity3D.o
 
 #OBJECTS=$(patsubst %.f,%.o,$(wildcard *.f))
 
 # --- commands -------------------------------------------------------
+
+#include makedepslist
 
 %.o ../obj/%.o: %.cpp
 	$(CC) -c $(COPT) $(CINCL) $< -o $@
@@ -68,10 +73,41 @@ OBJECTS = writervtk.o solverpetsc.o elementutilitiesbasisfuncs.o elementutilitie
 %.o ../obj/%.o: %.F
 	$(CF) -c $(FOPT) $(FINCL) $< -o $@
 
+%.o %.mod: %.F
+#%.o: %.F
+	$(CF) -c $(FOPT) $(FINCL) $< -o $@
+	mv $@ ../obj
+	mv *.mod ../obj
+
+
 
 vtktovtu: vtktovtu.o
 	${CC} -o vtktovtu vtktovtu.o ${CLIB}
 	rm  vtktovtu.o
+
+writervtk: writervtk.o
+	${CF} -o writervtk writervtk.o ${FLIB}
+	rm  writervtk.o
+
+solverpetsc: solverpetsc.o
+	${CC} -o solverpetsc solverpetsc.o ${FLIB}
+	rm  solverpetsc.o
+
+elementutilitiesbasisfuncs: elementutilitiesbasisfuncs.o
+	${CF} -o elementutilitiesbasisfuncs elementutilitiesbasisfuncs.o ${FLIB}
+	rm  elementutilitiesbasisfuncs.o
+
+elementutilitieselasticity2D: elementutilitieselasticity2D.o
+	${CF} -o elementutilitieselasticity2D elementutilitieselasticity2D.o ${FLIB}
+	rm  elementutilitieselasticity2D.o
+
+elementutilitieselasticity3D: elementutilitieselasticity3D.o
+	${CF} -o elementutilitieselasticity3D elementutilitieselasticity3D.o ${FLIB}
+	rm  elementutilitieselasticity3D.o
+
+elementutilitiespoisson: elementutilitiespoisson.o
+	${CF} -o elementutilitiespoisson elementutilitiespoisson.o ${FLIB}
+	rm  elementutilitiespoisson.o
 
 meshpartitioncpp: writervtk.o meshpartitioncpp.o
 	${CC} -o meshpartitioncpp meshpartitioncpp.o writervtk.o ${CLIB}
@@ -112,6 +148,10 @@ triaelasticityparallelimpl1: ${OBJECTS} triaelasticityparallelimpl1.o
 tetraelasticityparallelimpl1: ${OBJECTS} tetraelasticityparallelimpl1.o
 	${CF} -o tetraelasticityparallelimpl1 tetraelasticityparallelimpl1.o ${OBJECTS} ${FLIB}
 	rm  tetraelasticityparallelimpl1.o
+
+#meshpartitioncpp: meshpartitioncpp.o
+#	${CC} -o meshpartitioncpp meshpartitioncpp.o ${CLIB}
+#	rm  meshpartitioncpp.o
 
 clean:
 	rm *.o

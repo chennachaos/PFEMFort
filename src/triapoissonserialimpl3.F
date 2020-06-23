@@ -132,7 +132,8 @@
       CHARACTER (LEN=100) :: infileNodes
       CHARACTER (LEN=100) :: infileElems
       CHARACTER (LEN=100) :: infileDBCs
-      
+      CHARACTER (LEN=100) :: outFileName
+
       !Set file names
       !The file names are specified as inputs from the command line
       IF( iargc() < 3 ) THEN
@@ -586,17 +587,20 @@
       END DO
       CLOSE(1)
 
+      WRITE(outFileName,'(A,I5.5,A)') "PoissonTria-soln.vtk"
+
       ! write the solution to the VTK file
         call writeoutputvtk(
      1     ndim,
-     2     nElem_global,
-     3     nNode_global,
+     2     nElem,
+     3     nNode,
      4     npElem,
      5     ndof, 
      6     coords,
      7     elemNodeConn,
      8     elem_procid,
-     9     solnVTK)
+     9     solnVTK,
+     +     outFileName)
 
       write(*,*) "Deallocating the memory"
 
